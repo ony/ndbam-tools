@@ -1,0 +1,14 @@
+[package]
+name = "ndbam-tools"
+version = "0.1.0"
+authors = ["Mykola Orliuk <virkony@gmail.com>"]
+license = "LGPL-3.0"
+edition = "2018"
+
+[dependencies]
+structopt = "0.2"
+
+[lib]
+name = "ndbam"
+path = "src/lib.rs"
+
