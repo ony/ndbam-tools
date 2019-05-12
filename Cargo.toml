@@ -7,11 +7,12 @@ edition = "2018"
 
 [dependencies]
 structopt = "0.2"
-nom = "4.2.3"
+nom = "4.2"
 totems = "0"
 colored = "1.8"
+crypto-hash = "0.3"
+hex = "0.3"
 
 [lib]
 name = "ndbam"
 path = "src/lib.rs"
-
