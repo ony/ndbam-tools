@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use nom::IResult;
@@ -11,10 +11,26 @@ use crate::nom_extra::*;
 pub enum Entry {
     Dir { path: PathBuf },
     File { path: PathBuf, md5: String, mtime: SystemTime, extra: HashMap<String, String> },
-    Sym { path: PathBuf, target: PathBuf, extra: HashMap<String, String> },
+    Sym { path: PathBuf, target: PathBuf, mtime: SystemTime, extra: HashMap<String, String> },
 }
 
 impl Entry {
+
+    pub fn path(&self) -> &Path {
+        match self {
+            Entry::Dir { path, .. } => path,
+            Entry::File { path, .. } => path,
+            Entry::Sym { path, .. } => path,
+        }
+    }
+
+    pub fn mtime(&self) -> Option<&SystemTime> {
+        match self {
+            Entry::Dir { .. } => None,
+            Entry::File { mtime, .. } => Some(mtime),
+            Entry::Sym { mtime, .. } => Some(mtime),
+        }
+    }
 
     /// # Examples
     ///
@@ -28,9 +44,10 @@ impl Entry {
     /// assert_ok!(Entry::parse(b"type=dir path=/abc"), value == Entry::Dir { path: PathBuf::from("/abc") });
     /// assert_err!(Entry::parse(b"type=unknown"));
     ///
-    /// assert_ok!(Entry::parse(b"type=sym path=/def target=abc"), value == Entry::Sym {
+    /// assert_ok!(Entry::parse(b"type=sym path=/def target=abc mtime=1549752022"), value == Entry::Sym {
     ///            path: PathBuf::from("/def"),
     ///            target: PathBuf::from("abc"),
+    ///            mtime: UNIX_EPOCH + Duration::from_secs(1549752022),
     ///            extra: Default::default() });
     ///
     /// assert_ok!(Entry::parse(b"type=file path=/abc/f md5=d692bb800 mtime=1549752022"), value == Entry::File {
@@ -49,21 +66,23 @@ impl Entry {
         match kind.as_str() {
             "file" => Ok(Entry::File { path,
                 md5: fields.try_take("md5")?,
-                mtime: {
-                    let secs = stringify_err(fields.try_take("mtime")?.parse::<u64>())?;
-                    UNIX_EPOCH + Duration::from_secs(secs)
-                },
+                mtime: stringify_err(parse_mtime(&fields.try_take("mtime")?))?,
                 extra: fields.take_extra()}),
 
             "dir" => fields.no_extra_for(Entry::Dir { path }),
 
             "sym" => Ok(Entry::Sym { path,
                 target: PathBuf::from(fields.try_take("target")?),
+                mtime: stringify_err(parse_mtime(&fields.try_take("mtime")?))?,
                 extra: fields.take_extra()}),
 
             _ => Err(format!("Unknown type {:?}", kind))
         }
     }
+}
+
+fn parse_mtime(text: &str) -> Result<SystemTime, std::num::ParseIntError> {
+    Ok(UNIX_EPOCH + Duration::from_secs(text.parse::<u64>()?))
 }
 
 fn stringify_err<T, E: std::string::ToString>(res: Result<T, E>) -> Result<T, String> {
@@ -82,7 +101,7 @@ impl<'s> TokensExt<String> for Tokens<'s> {
     }
 
     fn take_extra(&mut self) -> HashMap<String, String> {
-        let mut extra = HashMap::new();
+        let mut extra = HashMap::with_capacity(self.len());
         for (k, v) in self.drain() {
             extra.insert(k.to_string(), v);
         }
