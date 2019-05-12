@@ -10,8 +10,8 @@ use crate::nom_extra::*;
 #[derive(Debug, PartialEq)]
 pub enum Entry {
     Dir { path: PathBuf },
-    File { path: PathBuf, md5: String, mtime: SystemTime },
-    Sym { path: PathBuf, target: PathBuf },
+    File { path: PathBuf, md5: String, mtime: SystemTime, extra: HashMap<String, String> },
+    Sym { path: PathBuf, target: PathBuf, extra: HashMap<String, String> },
 }
 
 impl Entry {
@@ -20,42 +20,80 @@ impl Entry {
     ///
     /// ```
     /// # #[macro_use] extern crate totems;
+    /// # use std::default::Default;
     /// # use std::path::PathBuf;
     /// # use std::time::{UNIX_EPOCH, Duration};
     /// # use ndbam::contents::Entry;
     ///
-    /// assert_eq!(Entry::parse(b"type=dir path=/abc"), Ok(Entry::Dir { path: PathBuf::from("/abc") }));
-    /// assert_eq!(Entry::parse(b"type=sym path=/def target=abc"), Ok(Entry::Sym { path: PathBuf::from("/def"), target: PathBuf::from("abc") }));
-    /// assert_eq!(Entry::parse(b"type=file path=/abc/f md5=d692bb800 mtime=1549752022"),
-    ///            Ok(Entry::File { path: PathBuf::from("/abc/f"), md5: "d692bb800".to_string(), mtime: UNIX_EPOCH + Duration::from_secs(1549752022) }));
+    /// assert_ok!(Entry::parse(b"type=dir path=/abc"), value == Entry::Dir { path: PathBuf::from("/abc") });
     /// assert_err!(Entry::parse(b"type=unknown"));
-    /// assert_err!(Entry::parse(b"="));
+    ///
+    /// assert_ok!(Entry::parse(b"type=sym path=/def target=abc"), value == Entry::Sym {
+    ///            path: PathBuf::from("/def"),
+    ///            target: PathBuf::from("abc"),
+    ///            extra: Default::default() });
+    ///
+    /// assert_ok!(Entry::parse(b"type=file path=/abc/f md5=d692bb800 mtime=1549752022"), value == Entry::File {
+    ///            path: PathBuf::from("/abc/f"),
+    ///            md5: "d692bb800".to_string(),
+    ///            mtime: UNIX_EPOCH + Duration::from_secs(1549752022),
+    ///            extra: Default::default() });
     /// ```
     pub fn parse(i: &[u8]) -> Result<Entry, String> {
-        fn stringify_err<T, E: std::string::ToString>(res: Result<T, E>) -> Result<T, String> {
-            res.map_err(|err| err.to_string())
-        }
-
         let (rest, mut fields) = stringify_err(tokens(i))?;
-        if !rest.is_empty() {
-            return Err(format!("Trailing input: {:02x?}", rest))
-        }
+        debug_assert!(rest.is_empty(), format!("Unexpected trailing input: {:02x?}", rest));
 
-        let mut field = |key: &str| {
-            fields.remove(key).map_or_else(|| Err(format!("Missing {:?} in {:?}", key, fields)), Ok)
-        };
-
-        let kind: String = field("type")?;
-        let path = PathBuf::from(field("path")?);
+        let kind = fields.try_take("type")?;
+        let path = PathBuf::from(fields.try_take("path")?);
 
         match kind.as_str() {
-            "file" => Ok(Entry::File { path, md5: field("md5")?, mtime: {
-                let secs = stringify_err(field("mtime")?.parse::<u64>())?;
-                UNIX_EPOCH + Duration::from_secs(secs)
-            }}),
-            "dir" => Ok(Entry::Dir { path }),
-            "sym" => Ok(Entry::Sym { path, target: PathBuf::from(field("target")?) }),
+            "file" => Ok(Entry::File { path,
+                md5: fields.try_take("md5")?,
+                mtime: {
+                    let secs = stringify_err(fields.try_take("mtime")?.parse::<u64>())?;
+                    UNIX_EPOCH + Duration::from_secs(secs)
+                },
+                extra: fields.take_extra()}),
+
+            "dir" => fields.no_extra_for(Entry::Dir { path }),
+
+            "sym" => Ok(Entry::Sym { path,
+                target: PathBuf::from(fields.try_take("target")?),
+                extra: fields.take_extra()}),
+
             _ => Err(format!("Unknown type {:?}", kind))
+        }
+    }
+}
+
+fn stringify_err<T, E: std::string::ToString>(res: Result<T, E>) -> Result<T, String> {
+    res.map_err(|err| err.to_string())
+}
+
+trait TokensExt<E> {
+    fn try_take(&mut self, key: &str) -> Result<String, E>;
+    fn take_extra(&mut self) -> HashMap<String, String>;
+    fn no_extra_for<T: std::fmt::Debug>(&self, val: T) -> Result<T, E>;
+}
+
+impl<'s> TokensExt<String> for Tokens<'s> {
+    fn try_take(&mut self, key: &str) -> Result<String, String> {
+        self.remove(key).map_or_else(|| Err(format!("Missing {:?} in {:?}", key, self)), Ok)
+    }
+
+    fn take_extra(&mut self) -> HashMap<String, String> {
+        let mut extra = HashMap::new();
+        for (k, v) in self.drain() {
+            extra.insert(k.to_string(), v);
+        }
+        extra
+    }
+
+    fn no_extra_for<T: std::fmt::Debug>(&self, val: T) -> Result<T, String> {
+        if !self.is_empty() {
+            Err(format!("Unexpected fields {:?} for {:?}", self.keys(), val))
+        } else {
+            Ok(val)
         }
     }
 }
@@ -67,7 +105,7 @@ type Tokens<'s> = HashMap<&'s str, String>;
 named!(hspace<&[u8], ()>, do_parse!(verify!(call!(is_a(b" \t")), |sp: &[u8]| sp.len() > 0) >> ()));
 named!(unescaped_value_chunk<&[u8], &[u8]>, verify!(call!(is_not(b" \t\\")), |chunk: &[u8]| chunk.len() > 0));
 named!(key<&[u8], &str>, do_parse!(name: is_not!(b"=") >> (std::str::from_utf8(name).unwrap())));
-named!(value<&[u8], String>, map_res_err!(
+named!(value<&[u8], String>, map_res!(
     escaped_transform!(unescaped_value_chunk, b'\\', alt!(tag!("n") => { |_| &b"\n"[..] } | take!(1))),
     map_utf8));
 
@@ -77,8 +115,10 @@ fn tokens(i: &[u8]) -> IResult<&[u8], Tokens> {
     let mut rest = i;
     let mut tokens = HashMap::new();
     loop {
-        let (rest_, token) = token(rest)?;
-        tokens.insert(token.0, token.1);
+        let (rest_, tok) = token(rest)?;
+        if let Some(_) = tokens.insert(tok.0, tok.1) {
+            fail(rest_)?;  // TODO: error details
+        }
         if let Ok((rest__, _)) = hspace(rest_) {
             rest = rest__;
         } else {
@@ -142,13 +182,13 @@ mod token_tests {
     }
 
     #[test] fn tokens_multiple() {
-        assert_ok!(tokens(b"abc=def ghi=jkl").map(|(r, h)| h.len()), value >= 2);
+        assert_ok!(tokens(b"abc=def ghi=jkl").map(|(_, h)| h.len()), value >= 2);
     }
 
     #[test] fn tokens_bad() {
         assert_err!(tokens(b""));
         assert_err!(tokens(b" "));
         assert_err!(tokens(b"="));
+        assert_err!(tokens(b"a=x a=y"));
     }
-
 }

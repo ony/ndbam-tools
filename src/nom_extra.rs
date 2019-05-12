@@ -1,7 +1,12 @@
-use nom::IResult;
+use std::str::*;
+use nom::{IResult, Err, ErrorKind};
 
-pub fn map_utf8(i: Vec<u8>) -> Result<String, u32> {
-    std::str::from_utf8(&i).map(String::from).map_err(|_| 0)
+pub fn map_utf8(i: Vec<u8>) -> Result<String, Utf8Error> {
+    from_utf8(&i).map(String::from)
+}
+
+pub fn fail(i: &[u8]) -> IResult<&[u8], &[u8]> {
+    Err(Err::Failure(error_position!(i, ErrorKind::Verify)))
 }
 
 // XXX: take_while/is_a/is_not are broken in nom-4.x for bounded input
