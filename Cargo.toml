@@ -7,6 +7,8 @@ edition = "2018"
 
 [dependencies]
 structopt = "0.2"
+nom = "4.2.3"
+totems = "0"
 
 [lib]
 name = "ndbam"

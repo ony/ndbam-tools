@@ -1,3 +1,12 @@
+#[macro_use]
+extern crate nom;
+
+#[macro_use]
+extern crate totems;
+
+pub mod contents;
+mod nom_extra;
+
 use std::path::{Path, PathBuf};
 use std::fs::ReadDir;
 use std::io;
