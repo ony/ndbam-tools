@@ -9,6 +9,9 @@ struct Opts {
     /// Location of database
     #[structopt(short = "l", long = "location", default_value = "/var/db/paludis/repositories/installed")]
     location: PathBuf,
+
+    #[structopt(long = "contents")]
+    contents: bool,
 }
 
 fn main() {
@@ -21,6 +24,11 @@ fn main() {
                  println!("{}:{}", pkg.full_name(), pkg.slot().unwrap_or("0"));
                  if let Ok(summary) = pkg.read_key("SUMMARY") {
                      if !summary.trim_end().is_empty() { println!("  Summary: {}", summary.trim_end()) }
+                 }
+                 if opts.contents {
+                     for entry in pkg.contents() {
+                         println!("  {:?}", entry);
+                     }
                  }
              })
         );

@@ -10,6 +10,7 @@ mod nom_extra;
 use std::path::{Path, PathBuf};
 use std::fs::ReadDir;
 use std::io;
+use std::io::prelude::*;
 use std::process;
 use std::time::UNIX_EPOCH;
 
@@ -38,7 +39,6 @@ impl<'p> NDBAM<'p> {
         })
     }
 }
-
 
 struct AllPackagesIter {
     names: ReadDir,
@@ -99,6 +99,13 @@ impl PackageView {
 
     pub fn read_key(&self, key: &str) -> io::Result<String> {
         std::fs::read_to_string(self.location.join(key))
+    }
+
+    pub fn contents(&self) -> impl Iterator<Item=contents::Entry> {
+        let f = std::fs::File::open(self.location.join("contents")).expect("invalid package entry");
+        io::BufReader::new(f)
+            .split(b'\n')
+            .map(|row| contents::Entry::parse(&row.unwrap()).unwrap())
     }
 }
 
