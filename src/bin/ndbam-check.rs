@@ -10,6 +10,7 @@ use ndbam::contents::*;
 use crypto_hash::{Algorithm, Hasher};
 use structopt::StructOpt;
 use colored::*;
+use bytesize::ByteSize;
 
 #[derive(StructOpt, Debug)]
 struct Opts {
@@ -29,6 +30,10 @@ struct Opts {
     #[structopt(long = "no-integrity")]
     no_integrity: bool,
 
+    /// Show sizes of all packages (inhibited by --no-contents)
+    #[structopt(short = "s", long = "show-size")]
+    show_size: bool,
+
     #[structopt(short = "v", long = "verbose")]
     verbose: bool,
 }
@@ -36,6 +41,7 @@ struct Opts {
 fn main() {
     let opts = Opts::from_args();
     let reg = NDBAM::new(&opts.location);
+    let mut total_size = 0u64;
     reg.all_packages()
         .map(|iter|
              for pkg in iter {
@@ -54,14 +60,24 @@ fn main() {
                      header()
                  }
                  if !opts.no_contents {
-                     check_contents(&opts, &pkg, &mut header)
+                     let size = check_contents(&opts, &pkg, &mut header);
+                     total_size += size;
+                     if opts.show_size { header() }
+                     if header_shown {
+                         println!("  # {}: {}", "Size".bold(), ByteSize::b(size));
+                     }
                  }
              }
         );
+    if opts.show_size && total_size > 0 {
+        println!("");
+        println!("  # {}: {}", "Total size".bold(), ByteSize::b(total_size));
+    }
 }
 
 
-fn check_contents(opts: &Opts, pkg: &PackageView, header: &mut impl FnMut()) {
+fn check_contents(opts: &Opts, pkg: &PackageView, header: &mut impl FnMut()) -> u64 {
+    let mut size = 0;
     for entry in pkg.contents() {
         if opts.verbose {
             println!("  {:?}", entry);
@@ -80,6 +96,7 @@ fn check_contents(opts: &Opts, pkg: &PackageView, header: &mut impl FnMut()) {
                 continue;
             }
         };
+        size += metadata.len();
 
         if !opts.allow_mtime {
             let mtime_changed = match (entry.mtime(), metadata.modified()) {
@@ -160,6 +177,7 @@ fn check_contents(opts: &Opts, pkg: &PackageView, header: &mut impl FnMut()) {
             },
         }
     }
+    size
 }
 
 fn epoch_secs(moment: &SystemTime) -> u64 {
