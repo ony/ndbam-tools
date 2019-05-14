@@ -29,6 +29,14 @@ impl<'p> NDBAM<'p> {
         NDBAM { location: location }
     }
 
+    pub fn versions_of(&self, name: &str) -> Option<impl Iterator<Item=PackageView>> {
+        if let Ok(versions) = self.location.join("data").join(name.replace("/", "---")).read_dir() {
+            Some(PackageVersionsIter { versions })
+        } else {
+            None
+        }
+    }
+
     pub fn all_packages(&self) -> Option<impl Iterator<Item=PackageView>> {
         let mut names = self.location.join("data").read_dir().expect("broken layout");
         AllPackagesIter::next_versions(&mut names).map(|versions| {
@@ -42,14 +50,14 @@ impl<'p> NDBAM<'p> {
 
 struct AllPackagesIter {
     names: ReadDir,
-    versions: ReadDir,
+    versions: PackageVersionsIter,
 }
 
 impl AllPackagesIter {
-    fn next_versions(names: &mut ReadDir) -> Option<ReadDir> {
+    fn next_versions(names: &mut ReadDir) -> Option<PackageVersionsIter> {
         while let Some(name) = names.next().map(Result::unwrap) {
             if let Ok(versions) = name.path().read_dir() {
-                return Some(versions);
+                return Some(PackageVersionsIter { versions });
             } else {
                 assert!(!name.file_type().unwrap().is_dir())
             }
@@ -64,13 +72,26 @@ impl Iterator for AllPackagesIter {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if let Some(version) = self.versions.next() {
-                return Some(PackageView { location: version.unwrap().path() })
+                return Some(version)
             } else if let Some(versions) = AllPackagesIter::next_versions(&mut self.names) {
                 self.versions = versions
             } else {
                 return None
             }
         }
+    }
+}
+
+struct PackageVersionsIter {
+    versions: ReadDir,
+}
+
+impl Iterator for PackageVersionsIter {
+    type Item = PackageView;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.versions.next()
+            .map(|version| PackageView { location: version.unwrap().path() })
     }
 }
 

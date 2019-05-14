@@ -73,6 +73,10 @@ struct Opts {
 
     #[structopt(short, long)]
     verbose: bool,
+
+    /// Package names to inspect (by default whole database)
+    #[structopt(name = "PACKAGE NAMES")]
+    names: Vec<String>,
 }
 
 fn main() {
@@ -81,23 +85,33 @@ fn main() {
 
     let reg = NDBAM::new(&opts.location);
     let mut total_size = 0u64;
-    reg.all_packages()
-        .map(|iter|
-             for pkg in iter {
-                 let mut reporter = ConsolePackageReporter::new(&pkg);
-                 if opts.verbose {
-                     reporter.header()
-                 }
-                 if !opts.no_contents {
-                     let size = check_contents(&opts, &pkg, &mut reporter);
-                     total_size += size;
-                     if opts.show_size { reporter.header() }  // force report
-                     if reporter.any_reports() {
-                         println!("  # {}: {}", "Size".bold(), ByteSize::b(size));
-                     }
-                 }
-             }
-        );
+    let mut handle_package = |pkg| {
+        let mut reporter = ConsolePackageReporter::new(&pkg);
+        if opts.verbose {
+            reporter.header()
+        }
+        if !opts.no_contents {
+            let size = check_contents(&opts, &pkg, &mut reporter);
+            total_size += size;
+            if opts.show_size { reporter.header() }  // force report
+            if reporter.any_reports() {
+                println!("  # {}: {}", "Size".bold(), ByteSize::b(size));
+            }
+        }
+    };
+
+    if opts.names.is_empty() {
+        reg.all_packages().map(|iter| for pkg in iter { handle_package(pkg) });
+    } else {
+        for ref name in &opts.names {
+            if let Some(iter) = reg.versions_of(name) {
+                for pkg in iter { handle_package(pkg) }
+            } else {
+                println!("{} - {}", name, "Not found".red().bold());
+            }
+        }
+    }
+
     if opts.show_size && total_size > 0 {
         println!("");
         println!("  # {}: {}", "Total size".bold(), ByteSize::b(total_size));
