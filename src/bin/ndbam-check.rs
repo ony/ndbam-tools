@@ -1,5 +1,8 @@
 extern crate structopt;
 
+#[macro_use]
+extern crate clap;
+
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::path::{Path, PathBuf};
 use std::fs;
@@ -9,13 +12,43 @@ use ndbam::*;
 use ndbam::contents::*;
 use crypto_hash::{Algorithm, Hasher};
 use structopt::StructOpt;
+use structopt::clap::AppSettings;
 use colored::*;
 use bytesize::ByteSize;
 
+
+arg_enum! {
+    #[derive(PartialEq, Debug)]
+    enum ColorWhen {
+        Auto = 0,
+        Always,
+        Never,
+    }
+}
+
+impl ColorWhen {
+    fn force(&self) {
+        match self {
+            ColorWhen::Auto => {
+                if !atty::is(atty::Stream::Stdout) {
+                    colored::control::set_override(false);
+                }
+            },
+            ColorWhen::Always => {
+                colored::control::set_override(true);
+            },
+            ColorWhen::Never => {
+                colored::control::set_override(false);
+            },
+        }
+    }
+}
+
 #[derive(StructOpt, Debug)]
+#[structopt(raw(global_settings = "&[AppSettings::ColoredHelp]"))]
 struct Opts {
     /// Location of database
-    #[structopt(short = "l", long = "location", default_value = "/var/db/paludis/repositories/installed")]
+    #[structopt(short, long, name = "PATH", default_value = "/var/db/paludis/repositories/installed")]
     location: PathBuf,
 
     /// Skip checking package contents
@@ -31,15 +64,21 @@ struct Opts {
     no_integrity: bool,
 
     /// Show sizes of all packages (inhibited by --no-contents)
-    #[structopt(short = "s", long = "show-size")]
+    #[structopt(short = "s", long = "show-size", raw(conflicts_with = r#""no_contents""#))]
     show_size: bool,
 
-    #[structopt(short = "v", long = "verbose")]
+    /// Colorize output?
+    #[structopt(long, name = "WHEN", default_value = "auto", raw(possible_values = "&ColorWhen::variants()", case_insensitive = "true"))]
+    color: ColorWhen,
+
+    #[structopt(short, long)]
     verbose: bool,
 }
 
 fn main() {
     let opts = Opts::from_args();
+    opts.color.force();
+
     let reg = NDBAM::new(&opts.location);
     let mut total_size = 0u64;
     reg.all_packages()
