@@ -45,25 +45,15 @@ fn main() {
     reg.all_packages()
         .map(|iter|
              for pkg in iter {
-                 let mut header_shown = false;
-                 let mut header = || {
-                     if header_shown { return }
-                     header_shown = true;
-                     println!("{}:{}", pkg.full_name(), pkg.slot().unwrap_or("0"));
-                     if let Ok(summary) = pkg.read_key("SUMMARY") {
-                         if !summary.trim_end().is_empty() {
-                             println!("  # {}: {}", "Summary".bold(), summary.trim_end())
-                         }
-                     }
-                 };
+                 let mut reporter = ConsolePackageReporter::new(&pkg);
                  if opts.verbose {
-                     header()
+                     reporter.header()
                  }
                  if !opts.no_contents {
-                     let size = check_contents(&opts, &pkg, &mut header);
+                     let size = check_contents(&opts, &pkg, &mut reporter);
                      total_size += size;
-                     if opts.show_size { header() }
-                     if header_shown {
+                     if opts.show_size { reporter.header() }  // force report
+                     if reporter.any_reports() {
                          println!("  # {}: {}", "Size".bold(), ByteSize::b(size));
                      }
                  }
@@ -75,10 +65,47 @@ fn main() {
     }
 }
 
+trait ContentReporter {
+    fn note(&mut self, content_entry: &Entry, class: char, note: &str);
+    fn err<E: ToString>(&mut self, content_entry: &Entry, err: E) {
+        self.note(content_entry, 'X', &err.to_string())
+    }
+}
 
-fn check_contents(opts: &Opts, pkg: &PackageView, header: &mut impl FnMut()) -> u64 {
+struct ConsolePackageReporter<'p> {
+    pkg: &'p PackageView,
+    any_reports: bool,
+}
+
+impl<'p> ConsolePackageReporter<'p> {
+    fn new(pkg: &PackageView) -> ConsolePackageReporter {
+        ConsolePackageReporter { pkg, any_reports: false }
+    }
+
+    fn any_reports(&self) -> bool { self.any_reports }
+
+    fn header(&mut self) {
+        if self.any_reports { return }
+        self.any_reports = true;
+        println!("{}:{}", self.pkg.full_name(), self.pkg.slot().unwrap_or("0"));
+        if let Ok(summary) = self.pkg.read_key("SUMMARY") {
+            if !summary.trim_end().is_empty() {
+                println!("  # {}: {}", "Summary".bold(), summary.trim_end());
+            }
+        }
+    }
+}
+
+impl<'p> ContentReporter for ConsolePackageReporter<'p> {
+    fn note(&mut self, content_entry: &Entry, class: char, note: &str) {
+        self.header();
+        println!("  {} {} {}", class, content_entry.path().to_string_lossy().red(), note);
+    }
+}
+
+fn check_contents(opts: &Opts, pkg: &PackageView, reporter: &mut impl ContentReporter) -> u64 {
     let mut size = 0;
-    for entry in pkg.contents() {
+    for ref entry in pkg.contents() {
         if opts.verbose {
             println!("  {:?}", entry);
         }
@@ -87,16 +114,14 @@ fn check_contents(opts: &Opts, pkg: &PackageView, header: &mut impl FnMut()) -> 
         let metadata = match path.symlink_metadata() {
             Ok(metadata) => metadata,
             Err(err) => {
-                header();
                 if err.kind() == std::io::ErrorKind::NotFound {
-                    println!("  X {} Does not exist", path.to_string_lossy().red());
+                    reporter.note(entry, 'X', "Does not exist");
                 } else {
-                    println!("  X {} {}", path.to_string_lossy().red(), err.to_string());
+                    reporter.err(entry, err);
                 }
                 continue;
             }
         };
-        size += metadata.len();
 
         if !opts.allow_mtime {
             let mtime_changed = match (entry.mtime(), metadata.modified()) {
@@ -105,8 +130,7 @@ fn check_contents(opts: &Opts, pkg: &PackageView, header: &mut impl FnMut()) -> 
             };
 
             if mtime_changed {
-                header();
-                println!("  M {} Modification time changed", path.to_string_lossy().red());
+                reporter.note(entry, 'X', "Modification time changed");
                 continue;
             }
         }
@@ -114,16 +138,14 @@ fn check_contents(opts: &Opts, pkg: &PackageView, header: &mut impl FnMut()) -> 
         match entry {
             Entry::Dir { .. } => {
                 if !metadata.is_dir() {
-                    header();
-                    println!("  T {} Not a directory", path.to_string_lossy().red());
+                    reporter.note(entry, 'T', "Not a directory");
                     continue;
                 }
             },
 
             Entry::File { ref md5, .. } => {
                 if !metadata.is_file() {
-                    header();
-                    println!("  T {} Not a regular file", path.to_string_lossy().red());
+                    reporter.note(entry, 'T', "Not a regular file");
                     continue;
                 }
 
@@ -131,13 +153,12 @@ fn check_contents(opts: &Opts, pkg: &PackageView, header: &mut impl FnMut()) -> 
                     match file_md5(path) {
                         Ok(real_md5) => {
                             if &real_md5 != md5 {
-                                header();
-                                println!("  C {} Content changed", path.to_string_lossy().red());
+                                reporter.note(entry, 'C', "Content changed");
                                 continue;
                             }
                         },
                         Err(err) => {
-                            println!("  X {} {}", path.to_string_lossy().red(), err.to_string());
+                            reporter.err(entry, err);
                         },
                     }
                 }
@@ -145,37 +166,35 @@ fn check_contents(opts: &Opts, pkg: &PackageView, header: &mut impl FnMut()) -> 
 
             Entry::Sym { ref target, .. } => {
                 if !metadata.file_type().is_symlink() {
-                    header();
-                    println!("  T {} Not a symbolic link", path.to_string_lossy().red());
+                    reporter.note(entry, 'T', "Not a symbolic link");
                     continue;
                 }
 
                 match path.read_link() {
                     Ok(real_target) => {
                         if *target != real_target {
-                            header();
-                            println!("  C {} Symlink changed", path.to_string_lossy().red());
+                            reporter.note(entry, 'C', "Symlink changed");
                             continue;
                         }
                     },
                     Err(err) => {
-                        header();
-                        println!("  X {} {}", path.to_string_lossy().red(), err.to_string());
+                        reporter.err(entry, err);
                         continue;
                     },
                 }
 
                 if let Err(err) = path.canonicalize() {
-                    header();
                     if err.kind() == std::io::ErrorKind::NotFound {
-                        println!("  X {} Dangling symbolic link", path.to_string_lossy().red());
+                        reporter.note(entry, 'X', "Dangling symbolic link");
                     } else {
-                        println!("  X {} {}", path.to_string_lossy().red(), err.to_string());
+                        reporter.err(entry, err);
                     }
-                    continue;
                 }
             },
         }
+
+        // Count only content confirmed to be owned by package
+        size += metadata.len();
     }
     size
 }
