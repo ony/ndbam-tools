@@ -5,6 +5,7 @@ extern crate clap;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::path::{Path, PathBuf};
+use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::io::{BufRead, Write};
@@ -63,6 +64,10 @@ struct Opts {
     #[structopt(long = "no-integrity")]
     no_integrity: bool,
 
+    /// Check file (can be specified multiple times)
+    #[structopt(long = "file", raw(conflicts_with = r#""no_contents""#))]
+    files: Vec<PathBuf>,
+
     /// Show sizes of all packages (inhibited by --no-contents)
     #[structopt(short = "s", long = "show-size", raw(conflicts_with = r#""no_contents""#))]
     show_size: bool,
@@ -83,6 +88,11 @@ fn main() {
     let opts = Opts::from_args();
     opts.color.force();
 
+    let mut files : HashSet<&Path> = HashSet::new();
+    for file in &opts.files {
+        files.insert(file.as_path());
+    }
+
     let reg = NDBAM::new(&opts.location);
     let mut total_size = 0u64;
     let mut handle_package = |pkg| {
@@ -91,7 +101,7 @@ fn main() {
             reporter.header()
         }
         if !opts.no_contents {
-            let size = check_contents(&opts, &pkg, &mut reporter);
+            let size = check_contents(&opts, &files, &pkg, &mut reporter);
             total_size += size;
             if opts.show_size { reporter.header() }  // force report
             if reporter.any_reports() {
@@ -123,6 +133,7 @@ trait ContentReporter {
     fn err<E: ToString>(&mut self, content_entry: &Entry, err: E) {
         self.note(content_entry, 'X', &err.to_string())
     }
+    fn dump_entry(&mut self, content_entry: &Entry);
 }
 
 struct ConsolePackageReporter<'p> {
@@ -154,16 +165,26 @@ impl<'p> ContentReporter for ConsolePackageReporter<'p> {
         self.header();
         println!("  {} {} {}", class, content_entry.path().to_string_lossy().red(), note);
     }
+    fn dump_entry(&mut self, content_entry: &Entry) {
+        self.header();
+        println!("  # {:?}", content_entry);
+    }
 }
 
-fn check_contents(opts: &Opts, pkg: &PackageView, reporter: &mut impl ContentReporter) -> u64 {
+fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, reporter: &mut impl ContentReporter) -> u64 {
     let mut size = 0;
     for ref entry in pkg.contents() {
-        if opts.verbose {
-            println!("  {:?}", entry);
+        let path = entry.path();
+        if !files.is_empty() && !files.contains(path) {
+            continue;
         }
 
-        let path = entry.path();
+        if opts.verbose {
+            reporter.dump_entry(entry);
+        } else if !files.is_empty() {
+            reporter.note(entry, '#', "Match");
+        }
+
         let metadata = match path.symlink_metadata() {
             Ok(metadata) => metadata,
             Err(err) => {
