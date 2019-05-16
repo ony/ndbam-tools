@@ -24,6 +24,12 @@ impl Entry {
         }
     }
 
+    pub fn path_in(&self, root: &Path) -> PathBuf {
+        let mut components = self.path().components();
+        components.next();
+        root.join(components.as_path())
+    }
+
     pub fn mtime(&self) -> Option<&SystemTime> {
         match self {
             Entry::Dir { .. } => None,

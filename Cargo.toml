@@ -9,12 +9,18 @@ edition = "2018"
 structopt = "0.2"
 clap = "2.21"
 nom = "4.2"
-totems = "0"
 colored = "1.8"
 crypto-hash = "0.3"
 hex = "0.3"
 bytesize = "1"
 atty = "0.2"
+
+# unit-tests
+totems = "0"
+
+# integration tests
+assert_cmd = "0.11"
+assert_fs = "0.11"
 
 [lib]
 name = "ndbam"

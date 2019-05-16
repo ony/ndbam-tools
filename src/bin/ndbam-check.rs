@@ -52,6 +52,10 @@ struct Opts {
     #[structopt(short, long, name = "PATH", default_value = "/var/db/paludis/repositories/installed")]
     location: PathBuf,
 
+    /// Root of managed filesystem
+    #[structopt(short, long, default_value = "/")]
+    root: PathBuf,
+
     /// Skip checking package contents
     #[structopt(long = "no-contents")]
     no_contents: bool,
@@ -85,7 +89,11 @@ struct Opts {
 }
 
 fn main() {
-    let opts = Opts::from_args();
+    let opts = {
+        let mut raw_opts = Opts::from_args();
+        raw_opts.root = raw_opts.root.canonicalize().expect("root should be a valid path");
+        raw_opts
+    };
     opts.color.force();
 
     let mut files : HashSet<&Path> = HashSet::new();
@@ -175,6 +183,7 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
     let mut size = 0;
     for ref entry in pkg.contents() {
         let path = entry.path();
+        let real_path = entry.path_in(&opts.root);
         if !files.is_empty() && !files.contains(path) {
             continue;
         }
@@ -185,7 +194,7 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
             reporter.note(entry, '#', "Match");
         }
 
-        let metadata = match path.symlink_metadata() {
+        let metadata = match real_path.symlink_metadata() {
             Ok(metadata) => metadata,
             Err(err) => {
                 if err.kind() == std::io::ErrorKind::NotFound {
@@ -204,7 +213,7 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
             };
 
             if mtime_changed {
-                reporter.note(entry, 'X', "Modification time changed");
+                reporter.note(entry, 'M', "Modification time changed");
                 continue;
             }
         }
@@ -224,7 +233,7 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
                 }
 
                 if !opts.no_integrity {
-                    match file_md5(path) {
+                    match file_md5(&real_path) {
                         Ok(real_md5) => {
                             if &real_md5 != md5 {
                                 reporter.note(entry, 'C', "Content changed");
@@ -244,7 +253,7 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
                     continue;
                 }
 
-                match path.read_link() {
+                match real_path.read_link() {
                     Ok(real_target) => {
                         if *target != real_target {
                             reporter.note(entry, 'C', "Symlink changed");
@@ -257,6 +266,7 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
                     },
                 }
 
+                // TODO: resolve links relatively to root
                 if let Err(err) = path.canonicalize() {
                     if err.kind() == std::io::ErrorKind::NotFound {
                         reporter.note(entry, 'X', "Dangling symbolic link");
