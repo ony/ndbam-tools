@@ -92,6 +92,13 @@ mod content_steps {
         given regex r"^directory (.+)$" (PathBuf) |world, path, _step| {
             fs::create_dir_all(world.real_path(&path)).unwrap();
         };
+
+        given regex r"^symlink (.+) to (.+)$" (PathBuf, PathBuf) |world, path, target, _step| {
+            let real_path = world.real_path(&path);
+            create_dir_for(&real_path);
+            fs::soft_link(&target, &real_path)
+                .expect(format!("symlink at {:?} {:?}", &real_path, &path).as_str());
+        };
     });
 
     fn create_dir_for(path: &Path) {

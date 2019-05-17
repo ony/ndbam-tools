@@ -270,8 +270,8 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
                 }
 
                 match real_path.read_link() {
-                    Ok(real_target) => {
-                        if *target != real_target {
+                    Ok(actual_target) => {
+                        if *target != actual_target {
                             reporter.note(entry, 'C', "Symlink changed");
                             continue;
                         }
@@ -282,10 +282,10 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
                     },
                 }
 
-                // TODO: resolve links relatively to root
-                if let Err(err) = path.canonicalize() {
+                if let Err(err) = root_canonicalize(&opts.root, path) {
                     if err.kind() == std::io::ErrorKind::NotFound {
                         reporter.note(entry, 'X', "Dangling symbolic link");
+                        continue;
                     } else {
                         reporter.err(entry, err);
                     }
@@ -297,6 +297,31 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
         size += metadata.len();
     }
     size
+}
+
+fn root_canonicalize(root: &Path, target: &Path) -> io::Result<PathBuf> {
+    debug_assert!(target.is_absolute());
+    let mut result = root.to_path_buf();
+    let mut level = 0;
+    let mut components = target.components();
+    components.next();  // skip leading root indicator
+    for component in components {
+        result.push(component);
+        level += 1;
+        if let Ok(target) = result.read_link() {
+            if target.is_absolute() {
+                // "Reset" to root
+                while level > 0 {
+                    result.pop();
+                    level -= 1;
+                }
+                result.push(target);
+            }
+            // I'm lazy to resolving relative alongside with proper "reset" to root
+        }
+    }
+
+    result.canonicalize()
 }
 
 fn epoch_secs(moment: &SystemTime) -> u64 {
