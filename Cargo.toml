@@ -15,12 +15,19 @@ hex = "0.3"
 bytesize = "1"
 atty = "0.2"
 
+[dev-dependencies]
 # unit-tests
 totems = "0"
 
 # integration tests
 assert_cmd = "0.11"
 assert_fs = "0.11"
+shellwords = "1.0.0"
+cucumber_rust = { version = "0.5.1", default-features = false }
+
+[[test]]
+name = "cucumber"
+harness = false # Allows Cucumber to print output instead of libtest
 
 [lib]
 name = "ndbam"
