@@ -103,6 +103,8 @@ fn main() {
 
     let reg = NDBAM::new(&opts.location);
     let mut total_size = 0u64;
+    let mut missing_packages = false;
+    let mut any_problems = false;
     let mut handle_package = |pkg| {
         let mut reporter = ConsolePackageReporter::new(&pkg);
         if opts.verbose {
@@ -110,6 +112,7 @@ fn main() {
         }
         if !opts.no_contents {
             let size = check_contents(&opts, &files, &pkg, &mut reporter);
+            any_problems = any_problems || reporter.any_problems;
             total_size += size;
             if opts.show_size { reporter.header() }  // force report
             if reporter.any_reports() {
@@ -126,6 +129,7 @@ fn main() {
                 for pkg in iter { handle_package(pkg) }
             } else {
                 println!("{} - {}", name, "Not found".red().bold());
+                missing_packages = true;
             }
         }
     }
@@ -133,6 +137,12 @@ fn main() {
     if opts.show_size && total_size > 0 {
         println!("");
         println!("  # {}: {}", "Total size".bold(), ByteSize::b(total_size));
+    }
+
+    if any_problems {
+        std::process::exit(1);
+    } else if missing_packages {
+        std::process::exit(2);
     }
 }
 
@@ -147,11 +157,12 @@ trait ContentReporter {
 struct ConsolePackageReporter<'p> {
     pkg: &'p PackageView,
     any_reports: bool,
+    any_problems: bool,
 }
 
 impl<'p> ConsolePackageReporter<'p> {
     fn new(pkg: &PackageView) -> ConsolePackageReporter {
-        ConsolePackageReporter { pkg, any_reports: false }
+        ConsolePackageReporter { pkg, any_reports: false, any_problems: false }
     }
 
     fn any_reports(&self) -> bool { self.any_reports }
@@ -172,6 +183,11 @@ impl<'p> ContentReporter for ConsolePackageReporter<'p> {
     fn note(&mut self, content_entry: &Entry, class: char, note: &str) {
         self.header();
         println!("  {} {} {}", class, content_entry.path().to_string_lossy().red(), note);
+
+        // TODO: use enum for class or separate method
+        if class != '#' {
+            self.any_problems = true;
+        }
     }
     fn dump_entry(&mut self, content_entry: &Entry) {
         self.header();

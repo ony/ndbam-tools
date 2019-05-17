@@ -54,6 +54,7 @@ mod basic_steps {
         };
 
         then "success" |world, _step| { world.cmd_assert().success(); };
+        then "failure" |world, _step| { world.cmd_assert().failure(); };
 
         then "no output" |world, _step| { world.cmd_assert().stdout(""); };
 
