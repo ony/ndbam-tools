@@ -88,6 +88,10 @@ mod content_steps {
                 fs::write(&real_path, "dummy")
             }.expect(format!("write to {:?} (original {:?})", &real_path, &path).as_str());
         };
+
+        given regex r"^directory (.+)$" (PathBuf) |world, path, _step| {
+            fs::create_dir_all(world.real_path(&path)).unwrap();
+        };
     });
 
     fn create_dir_for(path: &Path) {
