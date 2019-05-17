@@ -3,6 +3,7 @@ extern crate cucumber_rust;
 
 use std::default::Default;
 use std::process::Command;
+use std::path::{Path, PathBuf};
 
 use assert_cmd::prelude::*;
 
@@ -19,6 +20,12 @@ impl Env {
             .clone()
             .expect("missing command execution?")
             .assert()
+    }
+
+    fn real_path(&self, path: &Path) -> PathBuf {
+        let mut components = path.components();
+        components.next();
+        self.root.path().join(components.as_path())
     }
 }
 
@@ -65,8 +72,31 @@ mod basic_steps {
     });
 }
 
+mod content_steps {
+    use super::*;
+    use std::fs;
+
+    steps!(super::Env => {
+        given regex r"^file (.+)$" (PathBuf) |world, path, step| {
+            let real_path = world.real_path(&path);
+            create_dir_for(&real_path);
+            if let Some(content) = step.docstring() {
+                assert!(!content.contains('<') && !content.contains('>'),
+                    "variables are not yet supported. cucumber test skipped"); // magic trail to skip
+                fs::write(&real_path, content)
+            } else {
+                fs::write(&real_path, "dummy")
+            }.expect(format!("write to {:?} (original {:?})", &real_path, &path).as_str());
+        };
+    });
+
+    fn create_dir_for(path: &Path) {
+        path.parent().map(|parent| fs::create_dir_all(parent).unwrap() );
+    }
+}
+
 cucumber! {
     features: "./features",
     world: Env,
-    steps: &[basic_steps::steps]
+    steps: &[basic_steps::steps, content_steps::steps]
 }
