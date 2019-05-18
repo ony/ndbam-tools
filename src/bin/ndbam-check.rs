@@ -9,50 +9,20 @@ use std::io::{BufRead, Write};
 use ndbam::*;
 use ndbam::contents::*;
 use crypto_hash::{Algorithm, Hasher};
-use clap::arg_enum;
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
-use colored::*;
 use bytesize::ByteSize;
 
-
-arg_enum! {
-    #[derive(PartialEq, Debug)]
-    enum ColorWhen {
-        Auto = 0,
-        Always,
-        Never,
-    }
-}
-
-impl ColorWhen {
-    fn force(&self) {
-        match self {
-            ColorWhen::Auto => {
-                if !atty::is(atty::Stream::Stdout) {
-                    colored::control::set_override(false);
-                }
-            },
-            ColorWhen::Always => {
-                colored::control::set_override(true);
-            },
-            ColorWhen::Never => {
-                colored::control::set_override(false);
-            },
-        }
-    }
-}
+mod colorful;
+mod env_opts;
+use colorful::*;
+use env_opts::*;
 
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_settings = "&[AppSettings::ColoredHelp]"))]
 struct Opts {
-    /// Location of database
-    #[structopt(short, long, name = "PATH", default_value = "/var/db/paludis/repositories/installed")]
-    location: PathBuf,
-
-    /// Root of managed filesystem
-    #[structopt(short, long, default_value = "/")]
-    root: PathBuf,
+    #[structopt(flatten)]
+    env: EnvOpts,
 
     /// Skip checking package contents
     #[structopt(long = "no-contents")]
@@ -89,7 +59,7 @@ struct Opts {
 fn main() {
     let opts = {
         let mut raw_opts = Opts::from_args();
-        raw_opts.root = raw_opts.root.canonicalize().expect("root should be a valid path");
+        raw_opts.env.canonicalize();
         raw_opts
     };
     opts.color.force();
@@ -99,7 +69,7 @@ fn main() {
         files.insert(file.as_path());
     }
 
-    let reg = NDBAM::new(&opts.location);
+    let reg = opts.env.ndbam();
     let mut total_size = 0u64;
     let mut missing_packages = false;
     let mut any_problems = false;
@@ -197,7 +167,7 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
     let mut size = 0;
     for ref entry in pkg.contents() {
         let path = entry.path();
-        let real_path = entry.path_in(&opts.root);
+        let real_path = entry.path_in(&opts.env.root);
         if !files.is_empty() && !files.contains(path) {
             continue;
         }
@@ -283,7 +253,7 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
                     },
                 }
 
-                if let Err(err) = root_canonicalize(&opts.root, path) {
+                if let Err(err) = root_canonicalize(&opts.env.root, path) {
                     if err.kind() == std::io::ErrorKind::NotFound {
                         reporter.note(entry, 'X', "Dangling symbolic link");
                         continue;
