@@ -4,7 +4,7 @@ Feature: Identify modification time change (mtime)
         Given sample with minimum content
 
     Scenario: None of the files for package were modified since installation
-        Given file /note.txt having mtime <M1>
+        Given mtime for file /note.txt is <M1>
         And file /var/db/ndbam/data/dummy/0:0/contents
             """
             type=file path=/note.txt md5=00000000000000000000000000000000 mtime=<M1>
@@ -14,7 +14,7 @@ Feature: Identify modification time change (mtime)
         And no output
 
     Scenario: None of the files for package were modified since installation
-        Given file /note.txt having mtime <M1>
+        Given mtime for file /note.txt is <M1>
         And mtime <M2> 60 seconds in past
         And file /var/db/ndbam/data/dummy/0:0/contents
             """

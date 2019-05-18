@@ -6,8 +6,6 @@ steps!(Env => {
         let real_path = world.real_path(&path);
         create_dir_for(&real_path);
         if let Some(content) = step.docstring() {
-            assert!(!content.contains('<') && !content.contains('>'),
-            "variables are not yet supported. cucumber test skipped"); // magic trail to skip
             fs::write(&real_path, content)
         } else {
             fs::write(&real_path, "dummy")
