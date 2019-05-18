@@ -24,6 +24,7 @@ assert_cmd = "0.11"
 assert_fs = "0.11"
 shellwords = "1.0.0"
 cucumber_rust = { version = "0.5.1", default-features = false }
+predicates = "1.0"
 
 [[test]]
 name = "cucumber"

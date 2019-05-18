@@ -1,34 +1,61 @@
 use super::*;
 use std::fs;
 
+use assert_fs::prelude::*;
+use predicates::prelude::*;
+
 steps!(Env => {
-    given regex r"^file (.+)$" (PathBuf) |world, path, step| {
-        let real_path = world.real_path(&path);
-        create_dir_for(&real_path);
+    given regex r"^file (.+)$" (PathBuf) |world, ref path, step| {
+        let child_path = world.child_path(path);
         if let Some(content) = step.docstring() {
-            fs::write(&real_path, content)
+            child_path.write_str(content)
         } else {
-            fs::write(&real_path, "dummy")
-        }.expect(format!("write to {:?} (original {:?})", &real_path, &path).as_str());
+            child_path.touch()
+        }.expect(format!("write to {:?} (original {:?})", child_path.path(), &path).as_str());
     };
 
-    given regex r"^semi-binary file (.+)$" (PathBuf) |world, path, step| {
-        let real_path = world.real_path(&path);
+    given regex r"^semi-binary file (.+)$" (PathBuf) |world, ref path, step| {
         let content = encode_semi_binary(step.docstring().expect("docstring is mandatory for semi-binary file"));
-        create_dir_for(&real_path);
-        fs::write(&real_path, content)
-            .expect(format!("write to {:?} (original {:?})", &real_path, &path).as_str());
+        let child_path = world.child_path(path);
+        child_path.write_binary(&content)
+            .expect(format!("write to {:?} (original {:?})", child_path.path(), path).as_str());
     };
 
-    given regex r"^dir(?:ectory)? (.+)$" (PathBuf) |world, path, _step| {
-        fs::create_dir_all(world.real_path(&path)).unwrap();
+    given regex r"^dir(?:ectory)? (.+)$" (PathBuf) |world, ref path, _step| {
+        let child_path = world.child_path(path);
+        child_path.create_dir_all()
+            .expect(format!("create directory {:?} (original {:?})", child_path.path(), path).as_str());
     };
 
-    given regex r"^symlink (.+) to (.+)$" (PathBuf, PathBuf) |world, path, target, _step| {
-        let real_path = world.real_path(&path);
-        create_dir_for(&real_path);
-        std::os::unix::fs::symlink(&target, &real_path)
-            .expect(format!("symlink at {:?} {:?}", &real_path, &path).as_str());
+    // TODO: move to Unix-specific steps
+    given regex r"^symlink (.+) to (.+)$" (PathBuf, PathBuf) |world, ref path, ref target, _step| {
+        let child_path = world.child_path(path);
+        create_dir_for(child_path.path());
+        std::os::unix::fs::symlink(target, child_path.path())
+            .expect(format!("create symlink at {:?} {:?}", child_path.path(), path).as_str());
+    };
+
+    then regex r"^file (.+) exists$" (PathBuf) |world, ref path, step| {
+        let child_path = world.child_path(path);
+        child_path.assert(predicate::path::is_file());
+        if let Some(content) = step.docstring() {
+            child_path.assert(predicate::str::similar(content.clone()));
+        }
+    };
+
+    then regex r"^directory (.+) exists$" (PathBuf) |world, ref path, _step| {
+        let child_path = world.child_path(path);
+        child_path.assert(predicate::path::is_dir());
+    };
+
+    // TODO: move to Unix-specific steps
+    then regex r"^symlink (.+) exists$" (PathBuf) |world, ref path, _step| {
+        let child_path = world.child_path(path);
+        child_path.assert(predicate::path::is_symlink());
+    };
+
+    then regex r"^no (?:file|dir|directory|symlink) (.+) exists?$" (PathBuf) |world, ref path, _step| {
+        world.child_path(path).assert(predicate::path::missing());
     };
 });
 

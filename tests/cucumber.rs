@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use assert_cmd::prelude::*;
-use assert_fs::fixture::TempDir;
+use assert_fs::fixture::{TempDir, ChildPath, PathChild};
 
 pub struct Env {
     root: TempDir,
@@ -20,10 +20,10 @@ impl Env {
             .assert()
     }
 
-    fn real_path(&self, path: &Path) -> PathBuf {
+    fn child_path(&self, path: &Path) -> ChildPath {
         let mut components = path.components();
         components.next();
-        self.root.path().join(components.as_path())
+        self.root.child(components.as_path())
     }
 }
 
