@@ -43,3 +43,19 @@ Feature: We can use ndbam-check to verify size of package or total
               # Size: 0 B
             """
             # It is not intended to not report total size here
+
+    Scenario: Package with symlink and directories only
+        Given dir /lib
+        And symlink /lib64 to lib
+        And file /var/db/ndbam/data/no-files/0:0/contents
+            """
+            type=dir path=/lib
+            type=sym path=/lib64 target=lib mtime=0
+            """
+        When run ndbam-check --allow-mtime --no-integrity --show-size no-files
+        Then success
+        And output is:
+            """
+            no-files-0:0
+              # Size: 0 B
+            """

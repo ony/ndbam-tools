@@ -259,6 +259,9 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
                         },
                     }
                 }
+
+                // Count only file content confirmed to be owned by package
+                size += metadata.len();
             },
 
             Entry::Sym { ref target, .. } => {
@@ -290,9 +293,6 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
                 }
             },
         }
-
-        // Count only content confirmed to be owned by package
-        size += metadata.len();
     }
     size
 }
