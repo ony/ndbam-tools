@@ -1,5 +1,5 @@
+use nom::*;
 use std::str::*;
-use nom::{IResult, Err, ErrorKind};
 
 pub fn map_utf8(i: Vec<u8>) -> Result<String, Utf8Error> {
     from_utf8(&i).map(String::from)

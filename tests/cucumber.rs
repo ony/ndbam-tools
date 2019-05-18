@@ -1,12 +1,10 @@
-#[macro_use]
-extern crate cucumber_rust;
+use cucumber_rust::{cucumber, steps};
 
 use std::default::Default;
-use std::process::Command;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use assert_cmd::prelude::*;
-
 use assert_fs::fixture::TempDir;
 
 pub struct Env {

@@ -1,10 +1,3 @@
-#[macro_use]
-extern crate nom;
-
-#[cfg(test)]
-#[macro_use]
-extern crate totems;
-
 pub mod contents;
 mod nom_extra;
 

@@ -1,8 +1,5 @@
 extern crate structopt;
 
-#[macro_use]
-extern crate clap;
-
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::path::{Path, PathBuf};
 use std::collections::HashSet;
@@ -12,8 +9,9 @@ use std::io::{BufRead, Write};
 use ndbam::*;
 use ndbam::contents::*;
 use crypto_hash::{Algorithm, Hasher};
-use structopt::StructOpt;
+use clap::arg_enum;
 use structopt::clap::AppSettings;
+use structopt::StructOpt;
 use colored::*;
 use bytesize::ByteSize;
 

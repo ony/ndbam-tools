@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
-use nom::IResult;
 use crate::nom_extra::*;
+use nom::*;
 
 /// Represents NDBAM/VDB contents entry
 ///
@@ -41,7 +41,7 @@ impl Entry {
     /// # Examples
     ///
     /// ```
-    /// # #[macro_use] extern crate totems;
+    /// # use totems::*;
     /// # use std::default::Default;
     /// # use std::path::PathBuf;
     /// # use std::time::{UNIX_EPOCH, Duration};
@@ -155,6 +155,7 @@ fn tokens(i: &[u8]) -> IResult<&[u8], Tokens> {
 #[cfg(test)]
 mod token_tests {
     use super::*;
+    use totems::*;
 
     #[test] fn key_basic() {
         assert_eq!(key(b"abc=def"), Ok((&b"=def"[..], "abc")));
