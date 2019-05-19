@@ -3,6 +3,13 @@ use std::{fs, io};
 
 use tempfile::NamedTempFile;
 
+pub trait AtomicSession {
+    type AtomicResult;
+
+    /// Finish atomic session with commitment
+    fn commit(self) -> Self::AtomicResult;
+}
+
 pub struct AtomicFile {
     path: PathBuf,
     temp: NamedTempFile,
@@ -18,8 +25,13 @@ impl AtomicFile {
         Ok(AtomicFile { path, temp })
     }
 
+}
+
+impl AtomicSession for AtomicFile {
+    type AtomicResult = io::Result<()>;
+
     /// Actually replace/create file with content that were written already
-    pub fn commit(self) -> io::Result<()> {
+    fn commit(self) -> Self::AtomicResult {
         self.temp
             .into_temp_path()
             .persist(self.path)

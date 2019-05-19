@@ -6,6 +6,7 @@ use structopt::clap::AppSettings;
 use structopt::StructOpt;
 
 use env_opts::*;
+use ndbam::contents::*;
 
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_settings = "&[AppSettings::ColoredHelp]"))]

@@ -134,7 +134,7 @@ impl PackageView {
     }
 
     pub fn content_writer(&self) -> io::Result<contents::ContentsWriter> {
-        Ok(contents::ContentsWriter::create(self.location.join("contents"))?)
+        contents::create(self.location.join("contents"))
     }
 }
 
