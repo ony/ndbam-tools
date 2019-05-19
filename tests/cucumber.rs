@@ -6,6 +6,7 @@ use std::process::Command;
 
 use assert_cmd::prelude::*;
 use assert_fs::fixture::{TempDir, ChildPath, PathChild};
+use predicates::prelude::*;
 
 pub struct Env {
     root: TempDir,
@@ -76,6 +77,10 @@ mod basic_steps {
         then "output is:" |world, step| {
             let expected = step.docstring().unwrap().to_string();
             world.cmd_assert().stdout(expected + "\n");
+        };
+
+        then regex r"output contains:\s*(.*)" (String) |world, needle, _step| {
+            world.cmd_assert().stdout(predicate::str::contains(needle));
         };
     });
 }

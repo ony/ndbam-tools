@@ -2,7 +2,6 @@ use super::*;
 use std::fs;
 
 use assert_fs::prelude::*;
-use predicates::prelude::*;
 
 steps!(Env => {
     given regex r"^file (.+)$" (PathBuf) |world, ref path, step| {

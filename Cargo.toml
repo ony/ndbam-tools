@@ -15,6 +15,7 @@ hex = "0.3"
 bytesize = "1"
 atty = "0.2"
 tempfile = "3.0"
+walkdir = "2"
 
 [dev-dependencies]
 # unit-tests
@@ -26,6 +27,7 @@ assert_fs = "0.11"
 shellwords = "1.0.0"
 cucumber_rust = { version = "0.5.1", default-features = false }
 predicates = "1.0"
+spectral = "0.6.0"
 
 [[test]]
 name = "cucumber"

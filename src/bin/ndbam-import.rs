@@ -51,6 +51,11 @@ fn main() {
     }
 
     let pkg = reg.new_package_version(&opts.package_name, &opts.version, &opts.slot);
-    let content = pkg.content_writer().unwrap();
+    let mut content = pkg.content_writer().unwrap();
+    content.from_root(
+        &opts
+            .image
+            .unwrap_or_else(|| std::env::current_dir().unwrap()),
+    ).unwrap();
     content.commit().unwrap();
 }

@@ -19,8 +19,11 @@ Feature: Import/install files from prepared image folder
             """
             Hello Exherbo!
             """
-        When implemented
         When run ndbam-import --image ${root}/tmp/image just-file
+        Then success
+        When run ndbam-check -v just-file
+        Then output contains: cb4e2f2f8fddf2d59373bf01856e503e
+        When implemented
         Then success
         And file /hello.md exists
             """
