@@ -3,10 +3,10 @@ mod utils;
 
 use std::path::{Path, PathBuf};
 use std::fs::ReadDir;
-use std::io;
 use std::io::prelude::*;
 use std::process;
 use std::time::UNIX_EPOCH;
+use std::{fs, io};
 
 pub struct NDBAM<'p> {
     location: &'p Path,
@@ -24,7 +24,7 @@ impl<'p> NDBAM<'p> {
     }
 
     pub fn versions_of(&self, name: &str) -> Option<impl Iterator<Item=PackageView>> {
-        if let Ok(versions) = self.location.join("data").join(name.replace("/", "---")).read_dir() {
+        if let Ok(versions) = self.versions_path(name).read_dir() {
             Some(PackageVersionsIter { versions })
         } else {
             None
@@ -39,6 +39,16 @@ impl<'p> NDBAM<'p> {
                 versions: versions,
             }
         })
+    }
+
+    pub fn new_package_version(&self, name: &str, version: &str, slot: &str) -> PackageView {
+        let location = self.versions_path(name).join(format!("{}:{}:{}", version, slot, magic_cookie()));
+        fs::create_dir_all(&location).unwrap();
+        PackageView { location }
+    }
+
+    fn versions_path(&self, name: &str) -> PathBuf {
+        self.location.join("data").join(name.replace("/", "---"))
     }
 }
 
@@ -121,6 +131,10 @@ impl PackageView {
         io::BufReader::new(f)
             .split(b'\n')
             .map(|row| contents::Entry::parse(&row.unwrap()).unwrap())
+    }
+
+    pub fn content_writer(&self) -> io::Result<contents::ContentsWriter> {
+        Ok(contents::ContentsWriter::create(self.location.join("contents"))?)
     }
 }
 

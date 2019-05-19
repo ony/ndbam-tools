@@ -1,3 +1,5 @@
+mod writer;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
@@ -6,6 +8,7 @@ use crate::utils::nom_extra::*;
 use nom::*;
 
 pub use crate::utils::hashing::*;
+pub use writer::*;
 
 /// Represents NDBAM/VDB contents entry
 ///
