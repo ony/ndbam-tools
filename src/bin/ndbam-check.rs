@@ -3,12 +3,9 @@ extern crate structopt;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::path::{Path, PathBuf};
 use std::collections::HashSet;
-use std::fs;
 use std::io;
-use std::io::{BufRead, Write};
 use ndbam::*;
 use ndbam::contents::*;
-use crypto_hash::{Algorithm, Hasher};
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
 use bytesize::ByteSize;
@@ -217,7 +214,7 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
                 }
 
                 if !opts.no_integrity {
-                    match file_md5(&real_path) {
+                    match file_hash(Algorithm::MD5, real_path) {
                         Ok(real_md5) => {
                             if &real_md5 != md5 {
                                 reporter.note(entry, 'C', "Content changed");
@@ -294,19 +291,4 @@ fn root_canonicalize(root: &Path, target: &Path) -> io::Result<PathBuf> {
 
 fn epoch_secs(moment: &SystemTime) -> u64 {
     moment.duration_since(UNIX_EPOCH).unwrap().as_secs()
-}
-
-fn file_md5(path: &Path) -> io::Result<String> {
-    let mut reader = io::BufReader::new(fs::File::open(path)?);
-    let mut hasher = Hasher::new(Algorithm::MD5);
-    loop {
-        let chunk = reader.fill_buf()?;
-        if chunk.is_empty() {
-            return Ok(hex::encode(hasher.finish()))
-        }
-        hasher.write_all(chunk)?;
-
-        let n = chunk.len();
-        reader.consume(n);
-    }
 }

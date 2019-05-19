@@ -5,6 +5,8 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use crate::utils::nom_extra::*;
 use nom::*;
 
+pub use crate::utils::hashing::*;
+
 /// Represents NDBAM/VDB contents entry
 ///
 #[derive(Debug, PartialEq)]
