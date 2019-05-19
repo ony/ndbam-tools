@@ -49,11 +49,21 @@ mod basic_steps {
         };
 
         when regex r"^run (\S+)(.*)$" (String, String) |world, program, trail, _step| {
-            let args = shellwords::split(&trail).unwrap();
+            let location = world.root.path().join("var").join("db").join("ndbam");
+            let args: Vec<String> = {
+                shellwords::split(&trail).unwrap().iter()
+                    .map(|arg| {
+                        // TODO: proper expand
+                        arg.replace("${root}", world.root.path().to_str().unwrap())
+                            .replace("${location}", location.to_str().unwrap())
+                    })
+                    .collect()
+            };
+
             let mut cmd = Command::cargo_bin(program).unwrap();
             cmd.env("RUST_BACKTRACE", "1")
                 .arg("--root").arg(world.root.path())
-                .arg("--location").arg(world.root.path().join("var").join("db").join("ndbam"))
+                .arg("--location").arg(location)
                 .args(args);
             world.cmd_output = Some(cmd.output().unwrap());
         };

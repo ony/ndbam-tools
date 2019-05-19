@@ -9,8 +9,7 @@ Feature: Import/install files from prepared image folder
 
     Scenario: Install empty image folder
         Given directory /tmp/image
-        When implemented
-        When run ndbam-import --image /tmp/image empty-package
+        When run ndbam-import --image ${root}/tmp/image empty-package
         Then success
         When run ndbam-check empty-package
         Then success
@@ -21,7 +20,7 @@ Feature: Import/install files from prepared image folder
             Hello Exherbo!
             """
         When implemented
-        When run ndbam-import --image /tmp/image just-file
+        When run ndbam-import --image ${root}/tmp/image just-file
         Then success
         And file /hello.md exists
             """
@@ -32,7 +31,7 @@ Feature: Import/install files from prepared image folder
     Scenario: Install file in a sub-dir
         Given file /tmp/image/docs/hello.md
         When implemented
-        When run ndbam-import --image /tmp/image just-file
+        When run ndbam-import --image ${root}/tmp/image just-file
         Then success
         And file /docs/hello.md exists
         But no file /tmp/image/docs/hello.md exist
@@ -40,7 +39,7 @@ Feature: Import/install files from prepared image folder
     Scenario: Install empty directory
         Given dir /tmp/image/empty-dir
         When implemented
-        When run ndbam-import --image /tmp/image just-dir
+        When run ndbam-import --image ${root}/tmp/image just-dir
         Then success
         And directory /empty-dir exists
         But no directory /tmp/image/hello.md exist
@@ -49,6 +48,6 @@ Feature: Import/install files from prepared image folder
         Given dir /2019
         And symlink /tmp/image/latest to 2019
         When implemented
-        When run ndbam-import --image /tmp/image years
+        When run ndbam-import --image ${root}/tmp/image years
         And symlink /latest exists
         But no symlink /tmp/image/latest exist
