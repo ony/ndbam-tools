@@ -1,5 +1,5 @@
 pub mod contents;
-mod nom_extra;
+mod utils;
 
 use std::path::{Path, PathBuf};
 use std::fs::ReadDir;

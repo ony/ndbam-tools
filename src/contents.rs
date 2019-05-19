@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
-use crate::nom_extra::*;
+use crate::utils::nom_extra::*;
 use nom::*;
 
 /// Represents NDBAM/VDB contents entry
