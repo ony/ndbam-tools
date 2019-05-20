@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::io;
 use std::os::unix::ffi::OsStrExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use walkdir::WalkDir;
 
 pub use crate::utils::atomic_file::AtomicSession;
 use crate::utils::atomic_file::*;
@@ -22,18 +21,9 @@ impl<T: io::Write> ContentsWriter<T> {
         self.0
     }
 
-    pub fn from_root(&mut self, root: &Path) -> io::Result<()> {
-        for node in WalkDir::new(root) {
-            let node = node.unwrap();
-            self.write_entry(&Entry::from_path(node.path(), root)?)?;
-        }
-        Ok(())
-    }
-
     pub fn write_entry(&mut self, entry: &Entry) -> io::Result<()> {
         match entry {
             Entry::Dir { path } => {
-                println!("dir path: {:?}", path);
                 self.write_raw("type=dir path=")?;
                 self.write_escaped_os_str(dbg!(path.as_os_str()))?;
             }
@@ -43,7 +33,6 @@ impl<T: io::Write> ContentsWriter<T> {
                 mtime,
                 extra,
             } => {
-                println!("file path: {:?}", path);
                 self.write_raw("type=file path=")?;
                 self.write_escaped_os_str(path.as_os_str())?;
                 self.write_raw(" md5=")?;
@@ -58,7 +47,6 @@ impl<T: io::Write> ContentsWriter<T> {
                 mtime,
                 extra,
             } => {
-                println!("sym path: {:?}", path);
                 self.write_raw("type=sym path=")?;
                 self.write_escaped_os_str(path.as_os_str())?;
                 self.write_raw(" target=")?;

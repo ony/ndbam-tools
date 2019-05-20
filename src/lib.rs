@@ -1,4 +1,5 @@
 pub mod contents;
+pub mod merger;
 mod utils;
 
 use std::path::{Path, PathBuf};
