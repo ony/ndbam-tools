@@ -61,11 +61,21 @@ mod basic_steps {
                     .collect()
             };
 
-            let mut cmd = Command::cargo_bin(program).unwrap();
-            cmd.env("RUST_BACKTRACE", "1")
-                .arg("--root").arg(world.root.path())
-                .arg("--location").arg(location)
-                .args(args);
+            let mut cmd = if program.starts_with("ndbam-") {
+                Command::cargo_bin(&program).unwrap()
+            } else {
+                Command::new(&program)
+            };
+
+            if program.starts_with("ndbam-") {
+                cmd.env("RUST_BACKTRACE", "1")
+                    .arg("--root").arg(world.root.path())
+                    .arg("--location").arg(location)
+                    .args(args);
+            } else {
+                cmd.args(args);
+            }
+
             world.cmd_output = Some(cmd.output().unwrap());
         };
 

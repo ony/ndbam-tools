@@ -10,8 +10,21 @@ impl PackageView {
         let mut content = self.content_writer()?;
         for node in WalkDir::new(image) {
             let node = node?;
-            content.write_entry(&Entry::from_path(node.path(), image)?)?;
-            // TODO: merge content into _root
+            if node.path() == image {
+                continue  // skip root dir
+            }
+
+            let entry = Entry::from_path(node.path(), image)?;
+            let real_target = entry.path_in(root);
+            content.write_entry(&entry)?;
+            match entry {
+                Entry::Dir { .. } => unimplemented!(),  // TODO
+                Entry::File { .. } | Entry::Sym { .. } => {
+                    println!("moving {:?} to {:?}", node.path(), real_target);
+                    assert!(!real_target.exists(), "no collisions handling yet");  // TODO
+                    std::fs::rename(node.path(), real_target)?;  // TODO: handle cross-filesystem case
+                }
+            }
         }
         content.commit()?;
         Ok(())

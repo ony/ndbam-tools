@@ -22,9 +22,9 @@ Feature: Import/install files from prepared image folder
         When run ndbam-import --image ${root}/tmp/image just-file
         Then success
         When run ndbam-check -v just-file
-        Then output contains: cb4e2f2f8fddf2d59373bf01856e503e
-        When implemented
         Then success
+        And output contains: cb4e2f2f8fddf2d59373bf01856e503e
+        And output contains: Size: 14 B
         And file /hello.md exists
             """
             Hello Exherbo!
@@ -50,7 +50,7 @@ Feature: Import/install files from prepared image folder
     Scenario: Install symlink
         Given dir /2019
         And symlink /tmp/image/latest to 2019
-        When implemented
         When run ndbam-import --image ${root}/tmp/image years
+        Then success
         And symlink /latest exists
         But no symlink /tmp/image/latest exist
