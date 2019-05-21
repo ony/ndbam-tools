@@ -25,7 +25,7 @@ impl<T: io::Write> ContentsWriter<T> {
         match entry {
             Entry::Dir { path } => {
                 self.write_raw("type=dir path=")?;
-                self.write_escaped_os_str(dbg!(path.as_os_str()))?;
+                self.write_escaped_os_str(path.as_os_str())?;
             }
             Entry::File {
                 path,

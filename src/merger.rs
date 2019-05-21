@@ -30,6 +30,16 @@ impl PackageView {
                     } else {
                         // TODO: use ErrorKind to fail fast if not cross-filesystem case
                         if rename(node.path(), &real_target).is_ok() {
+                            // Record moved folder recursively
+                            for subnode in WalkDir::new(&real_target) {
+                                let subnode = subnode?;
+                                if node.path() == entry.path() {
+                                    continue; // skip dir we just moved
+                                }
+                                content.write_entry(&Entry::from_path(subnode.path(), root)?)?;
+                            }
+
+                            // No need to dive in
                             walker.skip_current_dir();
                         } else {
                             create_dir(&real_target)?;

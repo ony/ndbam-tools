@@ -33,8 +33,14 @@ Feature: Import/install files from prepared image folder
 
     Scenario: Install file in a sub-dir
         Given file /tmp/image/docs/hello.md
+            """
+            Hello Exherbo!
+            """
         When run ndbam-import --image ${root}/tmp/image just-file
         Then success
+        When run ndbam-check -v just-file
+        Then success
+        And output contains: cb4e2f2f8fddf2d59373bf01856e503e
         And file /docs/hello.md exists
         But no file /tmp/image/docs/hello.md exist
 
