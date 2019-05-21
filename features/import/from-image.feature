@@ -56,5 +56,5 @@ Feature: Import/install files from prepared image folder
         And symlink /tmp/image/latest to 2019
         When run ndbam-import --image ${root}/tmp/image years
         Then success
-        And symlink /latest exists
+        And symlink /latest to 2019 exists
         But no symlink /tmp/image/latest exist

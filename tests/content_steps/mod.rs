@@ -2,6 +2,7 @@ use super::*;
 use std::fs;
 
 use assert_fs::prelude::*;
+use spectral::prelude::*;
 
 steps!(Env => {
     given regex r"^file (.+)$" (PathBuf) |world, ref path, step| {
@@ -47,10 +48,12 @@ steps!(Env => {
         child_path.assert(predicate::path::is_dir());
     };
 
-    // TODO: move to Unix-specific steps
-    then regex r"^symlink (.+) exists$" (PathBuf) |world, ref path, _step| {
+    then regex r"^symlink (.+) to (.+) exists$" (PathBuf, PathBuf) |world, ref path, target, _step| {
         let child_path = world.child_path(path);
         child_path.assert(predicate::path::is_symlink());
+        assert_that!(fs::read_link(child_path.path()).unwrap())
+            .named(&format!("target for symlink {:?}", path))
+            .is_equal_to(target);
     };
 
     then regex r"^no (?:file|dir|directory|symlink) (.+) exists?$" (PathBuf) |world, ref path, _step| {
