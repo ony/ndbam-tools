@@ -33,7 +33,6 @@ Feature: Import/install files from prepared image folder
 
     Scenario: Install file in a sub-dir
         Given file /tmp/image/docs/hello.md
-        When implemented
         When run ndbam-import --image ${root}/tmp/image just-file
         Then success
         And file /docs/hello.md exists
@@ -41,7 +40,6 @@ Feature: Import/install files from prepared image folder
 
     Scenario: Install empty directory
         Given dir /tmp/image/empty-dir
-        When implemented
         When run ndbam-import --image ${root}/tmp/image just-dir
         Then success
         And directory /empty-dir exists

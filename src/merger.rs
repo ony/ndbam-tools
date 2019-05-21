@@ -1,3 +1,4 @@
+use std::fs::*;
 use std::io;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -8,7 +9,8 @@ use crate::contents::*;
 impl PackageView {
     pub fn merge(&self, image: &Path, root: &Path) -> io::Result<()> {
         let mut content = self.content_writer()?;
-        for node in WalkDir::new(image) {
+        let mut walker = WalkDir::new(image).into_iter();
+        while let Some(node) = walker.next() {
             let node = node?;
             if node.path() == image {
                 continue  // skip root dir
@@ -18,11 +20,29 @@ impl PackageView {
             let real_target = entry.path_in(root);
             content.write_entry(&entry)?;
             match entry {
-                Entry::Dir { .. } => unimplemented!(),  // TODO
+                Entry::Dir { .. } => {
+                    if let Ok(metadata) = real_target.symlink_metadata() {
+                        assert!(metadata.is_dir(), "TODO: report conflicting types");
+                        assert!(
+                            metadata.permissions() == node.path().metadata()?.permissions(),
+                            "TODO: resolve permissions conflict"
+                        )
+                    } else {
+                        // TODO: use ErrorKind to fail fast if not cross-filesystem case
+                        if rename(node.path(), &real_target).is_ok() {
+                            walker.skip_current_dir();
+                        } else {
+                            create_dir(&real_target)?;
+                            // TODO: ensure permissions include owner, caps, etc
+                            set_permissions(&real_target, node.path().metadata()?.permissions())?;
+                        }
+                    }
+                }
+
                 Entry::File { .. } | Entry::Sym { .. } => {
                     println!("moving {:?} to {:?}", node.path(), real_target);
-                    assert!(!real_target.exists(), "no collisions handling yet");  // TODO
-                    std::fs::rename(node.path(), real_target)?;  // TODO: handle cross-filesystem case
+                    assert!(!real_target.exists(), "TODO: handle file/symlink collisions");
+                    rename(node.path(), &real_target)?; // TODO: handle cross-fileystem via copy
                 }
             }
         }
