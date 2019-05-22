@@ -1,12 +1,11 @@
 mod env_opts;
 
-use std::borrow::Cow;
-use std::path::{Path, PathBuf};
-
+use std::path::PathBuf;
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
 
 use env_opts::*;
+use ndbam::*;
 
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_settings = "&[AppSettings::ColoredHelp]"))]
@@ -33,21 +32,17 @@ struct Opts {
 }
 
 impl Opts {
-    fn image(&self) -> Cow<Path> {
+    fn image(&self) -> impl RootPath {
         if let Some(ref image) = self.image {
-            Cow::from(image)
+            RootAtBuf(image.to_owned())
         } else {
-            Cow::from(std::env::current_dir().unwrap())
+            RootAtBuf(std::env::current_dir().unwrap())
         }
     }
 }
 
 fn main() {
-    let opts = {
-        let mut raw_opts = Opts::from_args();
-        raw_opts.env.canonicalize();
-        raw_opts
-    };
+    let opts =  Opts::from_args();
 
     let reg = opts.env.ndbam();
     assert!(
@@ -61,5 +56,5 @@ fn main() {
     }
 
     reg.new_package_version(&opts.package_name, &opts.version, &opts.slot)
-        .merge(opts.image().as_ref(), &opts.env.root).unwrap();
+        .merge(&opts.image(), &opts.env.root).unwrap();
 }

@@ -8,6 +8,7 @@ use std::io::prelude::*;
 use std::process;
 use std::time::UNIX_EPOCH;
 use std::{fs, io};
+pub use utils::virtual_root::*;
 
 pub struct NDBAM<'p> {
     location: &'p Path,

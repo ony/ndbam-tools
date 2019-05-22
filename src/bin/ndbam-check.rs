@@ -3,7 +3,6 @@ extern crate structopt;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::path::{Path, PathBuf};
 use std::collections::HashSet;
-use std::io;
 use ndbam::*;
 use ndbam::contents::*;
 use structopt::clap::AppSettings;
@@ -54,11 +53,7 @@ struct Opts {
 }
 
 fn main() {
-    let opts = {
-        let mut raw_opts = Opts::from_args();
-        raw_opts.env.canonicalize();
-        raw_opts
-    };
+    let opts =  Opts::from_args();
     opts.color.force();
 
     let mut files : HashSet<&Path> = HashSet::new();
@@ -161,10 +156,11 @@ impl<'p> ContentReporter for ConsolePackageReporter<'p> {
 }
 
 fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, reporter: &mut impl ContentReporter) -> u64 {
+    let root = &opts.env.root;
     let mut size = 0;
     for ref entry in pkg.contents() {
         let path = entry.path();
-        let real_path = entry.path_in(&opts.env.root);
+        let real_path = root.real_path(entry.path()).unwrap();
         if !files.is_empty() && !files.contains(path) {
             continue;
         }
@@ -250,7 +246,7 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
                     },
                 }
 
-                if let Err(err) = root_canonicalize(&opts.env.root, path) {
+                if let Err(err) = root.canonicalize_to_real(path) {
                     if err.kind() == std::io::ErrorKind::NotFound {
                         reporter.note(entry, 'X', "Dangling symbolic link");
                         continue;
@@ -262,31 +258,6 @@ fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, report
         }
     }
     size
-}
-
-fn root_canonicalize(root: &Path, target: &Path) -> io::Result<PathBuf> {
-    debug_assert!(target.is_absolute());
-    let mut result = root.to_path_buf();
-    let mut level = 0;
-    let mut components = target.components();
-    components.next();  // skip leading root indicator
-    for component in components {
-        result.push(component);
-        level += 1;
-        if let Ok(target) = result.read_link() {
-            if target.is_absolute() {
-                // "Reset" to root
-                while level > 0 {
-                    result.pop();
-                    level -= 1;
-                }
-                result.push(target);
-            }
-            // I'm lazy to resolving relative alongside with proper "reset" to root
-        }
-    }
-
-    result.canonicalize()
 }
 
 fn epoch_secs(moment: &SystemTime) -> u64 {

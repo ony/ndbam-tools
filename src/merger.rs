@@ -5,19 +5,20 @@ use walkdir::WalkDir;
 
 use super::PackageView;
 use crate::contents::*;
+use crate::utils::virtual_root::*;
 
 impl PackageView {
-    pub fn merge(&self, image: &Path, root: &Path) -> io::Result<()> {
+    pub fn merge(&self, image: &RootPath, root: &RootPath) -> io::Result<()> {
         let mut content = self.content_writer()?;
-        let mut walker = WalkDir::new(image).into_iter();
+        let mut walker = WalkDir::new(image.real_root()).into_iter();
         while let Some(node) = walker.next() {
             let node = node?;
-            if node.path() == image {
+            if node.path() == image.real_root() {
                 continue  // skip root dir
             }
 
             let entry = Entry::from_path(node.path(), image)?;
-            let real_target = entry.path_in(root);
+            let real_target = root.real_path(entry.path()).unwrap();
             content.write_entry(&entry)?;
             match entry {
                 Entry::Dir { .. } => {
@@ -62,9 +63,8 @@ impl PackageView {
 }
 
 impl Entry {
-    pub fn from_path(real_path: &Path, root: &Path) -> io::Result<Entry> {
-        let mut path = PathBuf::from("/");
-        path.push(real_path.strip_prefix(root).unwrap());
+    pub fn from_path(real_path: &Path, root: &RootPath) -> io::Result<Entry> {
+        let path = root.inner_path(real_path).unwrap().into_owned();
 
         let metadata = real_path.symlink_metadata()?;
         if metadata.is_dir() {
