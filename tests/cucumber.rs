@@ -92,6 +92,10 @@ mod basic_steps {
         then regex r"output contains:\s*(.*)" (String) |world, needle, _step| {
             world.cmd_assert().stdout(predicate::str::contains(needle));
         };
+
+        then regex r"errors do(?:es)? not contains?:\s*(.*)" (String) |world, needle, _step| {
+            world.cmd_assert().stderr(predicate::str::contains(needle).not());
+        };
     });
 }
 

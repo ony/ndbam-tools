@@ -17,16 +17,17 @@ pub trait RootPath {
     }
 
     /// Resolve inner path to real one that can be used outside of root filesystem.
-    fn real_path<'a>(&self, inner: &'a Path) -> Result<Cow<'a, Path>, StripPrefixError> {
+    fn real_path<'a>(&self, inner: &'a Path) -> io::Result<Cow<'a, Path>> {
         Ok(Cow::from(
             self.real_root()
-                .join(inner.strip_prefix(self.inner_root())?),
+                .join(self.relative_from_inner(inner)?),
         ))
     }
+
     /// Try to identify how real path will look inside of root filesystem.
-    fn inner_path<'a>(&self, real: &'a Path) -> Result<Cow<'a, Path>, StripPrefixError> {
+    fn inner_path<'a>(&self, real: &'a Path) -> io::Result<Cow<'a, Path>> {
         Ok(Cow::from(
-            self.inner_root().join(real.strip_prefix(self.real_root())?),
+            self.inner_root().join(self.relative_from_real(real)?),
         ))
     }
 
@@ -38,11 +39,11 @@ pub trait RootPath {
     /// Similar to [`std::fs::canoncialize`], but also can fail in case if relative path is outside
     /// of [`inner_path`].
     fn canonicalize_to_real(&self, inner: &Path) -> io::Result<PathBuf> {
-        let real_path = self.real_path(inner).map_err(|err| Error::new(ErrorKind::InvalidInput, err))?;
+        let rel_path = self.relative_from_inner(inner)?;
         let mut result = self.real_root().to_path_buf();
         let mut level = 0;
 
-        for component in real_path.components() {
+        for component in rel_path.components() {
             result.push(component);
             level += 1;
             if let Ok(target) = result.read_link() {
@@ -52,13 +53,21 @@ pub trait RootPath {
                         result.pop();
                         level -= 1;
                     }
-                    result.push(target);
+                    result.push(self.relative_from_inner(&target)?);
                 }
                 // I'm lazy to resolving relative alongside with proper "reset" to root
             }
         }
 
         result.canonicalize()
+    }
+
+    fn relative_from_inner<'a>(&self, inner: &'a Path) -> io::Result<&'a Path> {
+        inner.strip_prefix(self.inner_root()).map_err(|err| Error::new(ErrorKind::InvalidInput, err))
+    }
+
+    fn relative_from_real<'a>(&self, real: &'a Path) -> io::Result<&'a Path> {
+        real.strip_prefix(self.real_root()).map_err(|err| Error::new(ErrorKind::InvalidInput, err))
     }
 }
 
@@ -76,20 +85,20 @@ impl RootPath for AnyRoot {
         }
     }
 
-    fn real_path<'a>(&self, inner: &'a Path) -> Result<Cow<'a, Path>, StripPrefixError> {
+    fn real_path<'a>(&self, inner: &'a Path) -> io::Result<Cow<'a, Path>> {
         Ok(match self {
             AnyRoot::RealRoot => Cow::from(inner),
-            AnyRoot::RootAtBuf(ref path) => {
-                Cow::from(path.join(inner.strip_prefix(self.inner_root())?))
+            AnyRoot::RootAtBuf(ref root) => {
+                Cow::from(root.join(self.relative_from_inner(inner)?))
             }
         })
     }
 
-    fn inner_path<'a>(&self, real: &'a Path) -> Result<Cow<'a, Path>, StripPrefixError> {
+    fn inner_path<'a>(&self, real: &'a Path) -> io::Result<Cow<'a, Path>> {
         Ok(match self {
             AnyRoot::RealRoot => Cow::from(real),
-            AnyRoot::RootAtBuf(ref path) => {
-                Cow::from(self.inner_root().join(real.strip_prefix(path)?))
+            AnyRoot::RootAtBuf(..) => {
+                Cow::from(self.inner_root().join(self.relative_from_real(real)?))
             }
         })
     }

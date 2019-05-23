@@ -59,16 +59,17 @@ impl PackageView {
                             path.parent().expect("Root cannot be symlink").join(target)
                         };
 
+                        // XXX: This check is ineffective since we might have symlinks that leads
+                        // to root and back to image.
+                        // TODO: Stop checking symlink once we hit something that exists in root.
                         if root.canonicalize_to_real(&target).is_ok() {
                             // Looks good. We point to something that exist in filesystem where we
                             // plan to install. Now just ensure it will not be deleted during
                             // further merge. I.e. ensure that we are not pointing into image
                             // itself.
                             let merged_target = root.real_path(&target).unwrap();
-                            assert!(
-                                image.inner_path(&merged_target).is_err(),
-                                "Symlink target should not point back into image"
-                            );
+                            image.inner_path(&merged_target)
+                                .expect_err("Symlink target should not point back into image");
                         } else {
                             // Probably we didn't installed path that symlink is pointing to. Let's
                             // check if it exists in the image itself.

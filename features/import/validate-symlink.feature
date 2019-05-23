@@ -21,6 +21,17 @@ Feature: Correctness of symlinks proven before actual install
         Given symlink /tmp/image/flop to flip
         When run ndbam-import --image ${root}/tmp/image app-misc/flipflop
         Then failure
+        And errors do not contain: No such file or directory
+        And no symlink /flip exists
+        And no symlink /flop exists
+
+    Scenario: Absolute cross-link (infinite loop)
+        Given symlink /tmp/image/flip to /flop
+        Given symlink /tmp/image/flop to /flip
+        When run ndbam-import --image ${root}/tmp/image app-misc/flipflop
+        When fixed
+        Then failure
+        And errors do not contain: No such file or directory
         And no symlink /flip exists
         And no symlink /flop exists
 
