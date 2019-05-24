@@ -6,6 +6,8 @@ use structopt::StructOpt;
 
 use ndbam::*;
 
+use super::*;
+
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_settings = "&[AppSettings::ColoredHelp]"))]
 pub struct EnvOpts {
@@ -14,8 +16,8 @@ pub struct EnvOpts {
         short,
         long,
         name = "PATH",
-        default_value = "/var/db/paludis/repositories/installed",
-        parse(from_os_str = "parse_path_arg")
+        parse(from_os_str = "parse_path_arg"),
+        raw(default_value = "DEFAULT_REPO_PATH")
     )]
     pub location: PathBuf,
 

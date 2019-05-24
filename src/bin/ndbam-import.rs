@@ -7,6 +7,8 @@ use structopt::StructOpt;
 use env_opts::*;
 use ndbam::*;
 
+const DEFAULT_REPO_PATH : &'static str = "/var/db/paludis/repositories/unpackaged";
+
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_settings = "&[AppSettings::ColoredHelp]"))]
 struct Opts {

@@ -14,6 +14,8 @@ mod env_opts;
 use colorful::*;
 use env_opts::*;
 
+const DEFAULT_REPO_PATH : &'static str = "/var/db/paludis/repositories/installed";
+
 #[derive(StructOpt, Debug)]
 #[structopt(raw(global_settings = "&[AppSettings::ColoredHelp]"))]
 struct Opts {
