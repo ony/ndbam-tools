@@ -36,6 +36,10 @@ struct Opts {
     #[structopt(long = "file", raw(conflicts_with = r#""no_contents""#))]
     files: Vec<PathBuf>,
 
+    /// Exclude file (can be specified multiple times)
+    #[structopt(long = "exclude", raw(conflicts_with_all = r#"&["no_contents", "files"]"#))]
+    excludes: Vec<PathBuf>,
+
     /// Show sizes of all packages (inhibited by --no-contents)
     #[structopt(short = "s", long = "show-size", raw(conflicts_with = r#""no_contents""#))]
     show_size: bool,
@@ -52,14 +56,59 @@ struct Opts {
     names: Vec<String>,
 }
 
+trait ContentFilter {
+    fn skip_entry(&self, _: &Entry) -> bool {
+        false
+    }
+
+    fn should_report_matches(&self) -> bool {
+        false
+    }
+}
+
+enum FileFilter<'s> {
+    Everything,
+    Include(HashSet<&'s Path>),
+    Exclude(HashSet<&'s Path>),
+}
+
+impl<'s> ContentFilter for FileFilter<'s> {
+    fn skip_entry(&self, entry: &Entry) -> bool {
+        match self {
+            FileFilter::Everything => false,
+            FileFilter::Include(whitelist) => !whitelist.contains(entry.path()),
+            FileFilter::Exclude(blacklist) => blacklist.contains(entry.path()),
+        }
+    }
+    fn should_report_matches(&self) -> bool {
+        match self {
+            FileFilter::Everything => false,
+            FileFilter::Include(_) => true,
+            FileFilter::Exclude(_) => false,
+        }
+    }
+}
+
 fn main() {
     let opts =  Opts::from_args();
     opts.color.force();
 
-    let mut files : HashSet<&Path> = HashSet::new();
-    for file in &opts.files {
-        files.insert(file.as_path());
-    }
+
+    let content_filter = if !opts.files.is_empty() {
+        let mut files : HashSet<&Path> = HashSet::new();
+        for ref file in &opts.files {
+            files.insert(file);
+        }
+        FileFilter::Include(files)
+    } else if !opts.excludes.is_empty() {
+        let mut files : HashSet<&Path> = HashSet::new();
+        for ref file in &opts.excludes {
+            files.insert(file);
+        }
+        FileFilter::Exclude(files)
+    } else {
+        FileFilter::Everything
+    };
 
     let reg = opts.env.ndbam();
     let mut total_size = 0u64;
@@ -71,7 +120,7 @@ fn main() {
             reporter.header()
         }
         if !opts.no_contents {
-            let size = check_contents(&opts, &files, &pkg, &mut reporter);
+            let size = check_contents(&opts, &content_filter, &pkg, &mut reporter);
             any_problems = any_problems || reporter.any_problems;
             total_size += size;
             if opts.show_size { reporter.header() }  // force report
@@ -155,19 +204,19 @@ impl<'p> ContentReporter for ConsolePackageReporter<'p> {
     }
 }
 
-fn check_contents(opts: &Opts, files: &HashSet<&Path>, pkg: &PackageView, reporter: &mut impl ContentReporter) -> u64 {
+fn check_contents(opts: &Opts, filter: &ContentFilter, pkg: &PackageView, reporter: &mut impl ContentReporter) -> u64 {
     let root = &opts.env.root;
     let mut size = 0;
     for ref entry in pkg.contents() {
         let path = entry.path();
         let real_path = root.real_path(entry.path()).unwrap();
-        if !files.is_empty() && !files.contains(path) {
+        if filter.skip_entry(&entry) {
             continue;
         }
 
         if opts.verbose {
             reporter.dump_entry(entry);
-        } else if !files.is_empty() {
+        } else if filter.should_report_matches() {
             reporter.note(entry, '#', "Match");
         }
 
